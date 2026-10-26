@@ -9,12 +9,21 @@ p,li{color:var(--fg)}.mut{color:var(--mut)}a{color:var(--ac)}nav{display:flex;ga
 .card{background:var(--card);padding:16px;border-radius:12px;word-break:break-all}code{font-size:1.05rem}
 footer{margin-top:48px;color:var(--mut);font-size:.85rem}
 </style></head>
-<body><main><h1>Authorization</h1><div id="out"><p>Waiting for TikTok…</p></div>
+<body><main><h1>Authorization</h1><p id="out">Completing login with TikTok…</p>
+<script src="config.js"></script>
 <script>
-var p=new URLSearchParams(location.search),o=document.getElementById("out"),code=p.get("code"),err=p.get("error");
-function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
-if(code){o.innerHTML='<p>Authorization successful. Copy this code and paste it into the token script. It is only valid for a short time.</p><div class="card"><code id="c">'+esc(code)+'</code></div><p><button onclick="navigator.clipboard.writeText(document.getElementById(\'c\').textContent)">Copy code</button></p>';
-history.replaceState(null,"",location.pathname);}
-else if(err){o.innerHTML='<p>Authorization failed: '+esc(p.get("error_description")||err)+'</p>';}
-else{o.innerHTML='<p>No authorization code in this URL. Start the login from the token script.</p>';}
+(function(){
+  var C=window.APP_CONFIG,o=document.getElementById("out"),p=new URLSearchParams(location.search);
+  var code=p.get("code"),state=p.get("state"),err=p.get("error");
+  function fail(t){o.textContent=t;o.className="err";o.insertAdjacentHTML("afterend",'<p><a href="index.html">Back to start</a></p>');}
+  var saved=null;try{saved=sessionStorage.getItem("tt_state");}catch(e){}
+  history.replaceState(null,"",location.pathname);
+  if(err){return fail("Authorization failed: "+(p.get("error_description")||err));}
+  if(!code){return fail("No authorization code found. Please start the login from the start page.");}
+  if(!saved||saved!==state){return fail("Security check failed (state mismatch). Please try again from the start page.");}
+  fetch(C.worker+"/api/token",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code:code})})
+   .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||r.status);return j;});})
+   .then(function(j){try{sessionStorage.setItem("tt_token",j.access_token);sessionStorage.removeItem("tt_state");sessionStorage.setItem("tt_flash","TikTok account connected.");}catch(e){}location.replace("index.html");})
+   .catch(function(e){fail("Could not complete login: "+e.message);});
+})();
 </script></main></body></html>

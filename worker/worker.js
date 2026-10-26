@@ -118,7 +118,13 @@ export default {
           body: JSON.stringify({ publish_id: id }),
         });
         const data = await readJson(res);
-        return json({ status: data.data && data.data.status, fail_reason: data.data && data.data.fail_reason });
+        return json({
+          http: res.status,
+          status: data.data && data.data.status,
+          fail_reason: data.data && data.data.fail_reason,
+          uploaded_bytes: data.data && data.data.uploaded_bytes,
+          error: data.error && (data.error.code + ": " + data.error.message),
+        });
       }
 
       return json({ error: "not_found" }, 404);

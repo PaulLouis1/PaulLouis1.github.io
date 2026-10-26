@@ -40,10 +40,11 @@
       var tries = 0;
       (function poll() {
         api("/api/status?publish_id=" + encodeURIComponent(r.publish_id)).then(function (s) {
-          if (s.status === "SEND_TO_USER_INBOX" || s.status === "PUBLISH_COMPLETE") msg("Done. The video is now a draft in your TikTok inbox. Open the TikTok app to review and publish it.", "ok");
+          if (s.error && !s.status) msg("TikTok status error: " + s.error, "err");
+          else if (s.status === "SEND_TO_USER_INBOX" || s.status === "PUBLISH_COMPLETE") msg("Done. The video is now a draft in your TikTok inbox. Open the TikTok app to review and publish it.", "ok");
           else if (s.status === "FAILED") msg("TikTok reported a failure: " + (s.fail_reason || "unknown"), "err");
-          else if (++tries < 30) { msg("TikTok is processing the video… (" + (s.status || "pending") + ")"); setTimeout(poll, 3000); }
-          else msg("Still processing. Check your TikTok inbox in a moment.");
+          else if (++tries < 30) { msg("TikTok is processing the video… " + (s.status || (s.error ? s.error : "pending"))); setTimeout(poll, 3000); }
+          else msg("No final status from TikTok yet. Last answer: " + JSON.stringify(s) + ". Check your TikTok inbox.", "err");
         }).catch(function (e) { msg("Status check failed: " + e.message, "err"); });
       })();
     }).catch(function (e) { msg("Upload failed: " + e.message, "err"); $("send").disabled = false; });

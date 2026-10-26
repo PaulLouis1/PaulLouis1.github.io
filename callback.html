@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Authorization – Matchday Recap</title><meta name="robots" content="noindex"><style>
+:root{--bg:#0b1220;--fg:#e8edf5;--mut:#9aa7bd;--ac:#2ecc71;--card:#131c2e}
+@media(prefers-color-scheme:light){:root{--bg:#f5f7fb;--fg:#14202e;--mut:#5a6a80;--ac:#17a553;--card:#fff}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+main{max-width:720px;margin:0 auto;padding:40px 16px}h1{font-size:1.9rem;margin:.2em 0}h2{font-size:1.15rem;margin-top:1.8em;color:var(--ac)}
+p,li{color:var(--fg)}.mut{color:var(--mut)}a{color:var(--ac)}nav{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:24px;font-size:.95rem}
+.card{background:var(--card);padding:16px;border-radius:12px;word-break:break-all}code{font-size:1.05rem}
+footer{margin-top:48px;color:var(--mut);font-size:.85rem}
+</style></head>
+<body><main><h1>Authorization</h1><div id="out"><p>Waiting for TikTok…</p></div>
+<script>
+var p=new URLSearchParams(location.search),o=document.getElementById("out"),code=p.get("code"),err=p.get("error");
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+if(code){o.innerHTML='<p>Authorization successful. Copy this code and paste it into the token script. It is only valid for a short time.</p><div class="card"><code id="c">'+esc(code)+'</code></div><p><button onclick="navigator.clipboard.writeText(document.getElementById(\'c\').textContent)">Copy code</button></p>';
+history.replaceState(null,"",location.pathname);}
+else if(err){o.innerHTML='<p>Authorization failed: '+esc(p.get("error_description")||err)+'</p>';}
+else{o.innerHTML='<p>No authorization code in this URL. Start the login from the token script.</p>';}
+</script></main></body></html>

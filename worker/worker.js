@@ -3,7 +3,10 @@
 // Variables to set in Cloudflare (Settings > Variables and Secrets):
 //   TIKTOK_CLIENT_KEY      (text)
 //   TIKTOK_CLIENT_SECRET   (secret)
-// Nothing is stored by this worker: tokens are only passed through.
+//   BOT_KEY               (secret)  password for the scheduled uploader (/api/bot/token)
+// KV namespace binding (Settings > Bindings > KV namespace): variable name TOKENS
+// The first account that logs in becomes the "owner"; its refresh token is kept in KV so the scheduled
+// uploader can get fresh access tokens. Videos and access tokens are never stored.
 
 const ALLOWED_ORIGIN = "https://paullouis1.github.io";
 const REDIRECT_URI = "https://paullouis1.github.io/callback.html";
@@ -30,6 +33,13 @@ function json(obj, status = 200) {
 function bearer(request) {
   const h = request.headers.get("Authorization") || "";
   return h.startsWith("Bearer ") ? h.slice(7) : "";
+}
+
+function safeEqual(a, b) {
+  if (a.length !== b.length) return false;
+  let r = 0;
+  for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return r === 0;
 }
 
 async function readJson(res) {
@@ -62,7 +72,39 @@ export default {
         });
         const data = await readJson(res);
         if (!res.ok || data.error) return json({ error: data.error || "token_failed", detail: data.error_description }, 400);
+        if (env.TOKENS && data.refresh_token && data.open_id) {
+          const owner = await env.TOKENS.get("owner", "json");
+          if (!owner || owner.open_id === data.open_id) {
+            await env.TOKENS.put("owner", JSON.stringify({ open_id: data.open_id, refresh_token: data.refresh_token }));
+          }
+        }
         return json({ access_token: data.access_token, expires_in: data.expires_in, scope: data.scope });
+      }
+
+      // 1b) scheduled uploader: fresh access token from the stored refresh token
+      if (url.pathname === "/api/bot/token" && request.method === "POST") {
+        const given = request.headers.get("X-Bot-Key") || "";
+        if (!env.BOT_KEY || !env.TOKENS || !safeEqual(given, env.BOT_KEY)) return json({ error: "forbidden" }, 403);
+        const owner = await env.TOKENS.get("owner", "json");
+        if (!owner) return json({ error: "no_owner_logged_in" }, 404);
+        const res = await fetch(`${TT}/v2/oauth/token/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            client_key: env.TIKTOK_CLIENT_KEY,
+            client_secret: env.TIKTOK_CLIENT_SECRET,
+            grant_type: "refresh_token",
+            refresh_token: owner.refresh_token,
+          }),
+        });
+        const data = await readJson(res);
+        if (!res.ok || data.error || !data.access_token) {
+          return json({ error: data.error || "refresh_failed", detail: data.error_description }, 400);
+        }
+        if (data.refresh_token && data.refresh_token !== owner.refresh_token) {
+          await env.TOKENS.put("owner", JSON.stringify({ open_id: owner.open_id, refresh_token: data.refresh_token }));
+        }
+        return json({ access_token: data.access_token, expires_in: data.expires_in });
       }
 
       // 2) who is logged in (user.info.basic)
